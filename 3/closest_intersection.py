@@ -1,6 +1,6 @@
 def line_segments(path, start_x=0, start_y=0):
-    horizontals = []  # [((left, right), Y), ...]
-    verticals = []  # [(X, (bottom, top)), ...]
+    horizontals = []  # [{left, right, Y}, ...]
+    verticals = []  # [{X, top, bottom}, ...]
     x = start_x
     y = start_y
     cumulative = 0
@@ -15,12 +15,12 @@ def line_segments(path, start_x=0, start_y=0):
 
         if direction == 'D' or direction == 'U':
             end = y + magnitude
-            segment.update({'x': x, 'left': min(y, end), 'right': max(y, end)})
+            segment.update({'bottom': min(y, end), 'top': max(y, end), 'x': x})
             verticals.append(segment)
             y = end
         elif direction == 'L' or direction == 'R':
             end = x + magnitude
-            segment.update({'bottom': min(x, end), 'top': max(x, end), 'y': y})
+            segment.update({'left': min(x, end), 'right': max(x, end), 'y': y})
             horizontals.append(segment)
             x = end
         cumulative += abs(magnitude)
@@ -33,7 +33,9 @@ def orthogonal_intersections(horizontals, verticals):
     """
     for level in horizontals:
         for normal in verticals:
-            if level['bottom'] <= normal['x'] <= level['top'] and normal['left'] <= level['y'] <= normal['right']:
+            if normal['bottom'] <= level['y'] <= normal['top'] and level['left'] <= normal['x'] <= level['right']:
+                if level['idx'] == normal['idx'] == 0:
+                    continue
                 yield level, normal
 
 
@@ -47,10 +49,10 @@ def manhattan_distance(level, normal):
     return abs(normal['x']) + abs(level['y'])
 
 
-def path_distance(level, normal):
-    level_path = level['top'] - normal['x'] if level['direction'] == 'D' else normal['x'] - level['bottom']
-    normal_path = normal['right'] - level['y'] if normal['direction'] == 'L' else level['y'] - normal['left']
-    return level['trailing'] + normal['trailing'] + level_path + normal_path
+def signal_distance(level, normal):
+    level_dist = (level['right'] - normal['x'] if level['direction'] == 'L' else normal['x'] - level['left'])
+    normal_dist = (normal['top'] - level['y'] if normal['direction'] == 'D' else level['y'] - normal['bottom'])
+    return level['trailing'] + normal['trailing'] + level_dist + normal_dist
 
 
 def intersection_distance(distance_func, path1, path2):
@@ -61,4 +63,4 @@ if __name__ == '__main__':
     with open('input.txt') as f:
         paths = [line_segments(x.strip()) for x in f.readlines()]
         print('part 1: ', min(intersection_distance(manhattan_distance, *paths)))
-        print('part 2: ', min(intersection_distance(path_distance, *paths)))
+        print('part 2: ', min(intersection_distance(signal_distance, *paths)))
