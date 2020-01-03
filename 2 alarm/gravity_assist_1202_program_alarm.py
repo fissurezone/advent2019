@@ -1,6 +1,9 @@
 from operator import add, mul
 
-class ParseError(Exception): pass
+
+class ParseError(Exception):
+    pass
+
 
 def computer(arr, instruction_pointer):
     if instruction_pointer >= len(arr):
@@ -15,17 +18,18 @@ def computer(arr, instruction_pointer):
         99: (None, 0, None)
     }
     
-    oinstruction_pointerode = arr[instruction_pointer]
-    if oinstruction_pointerode == 99:
+    opcode = arr[instruction_pointer]
+    if opcode == 99:
         return
-    elif 1 <= oinstruction_pointerode <= 2:
-        operator_type, arg_count, operator_func = operator_map[oinstruction_pointerode]
+    elif 1 <= opcode <= 2:
+        operator_type, arg_count, operator_func = operator_map[opcode]
         if len(arr) <= instruction_pointer + arg_count:
-            raise ParseError("Missing required arguments for oinstruction_pointerode: {}".format(oinstruction_pointerode))
+            raise ParseError("Missing required arguments for opcode: {}".format(opcode))
         operator_type(operator_func, *arr[instruction_pointer+1:instruction_pointer+arg_count+1])
         return computer(arr, instruction_pointer + arg_count + 1)
     else:
-        raise ParseError("Unknown oinstruction_pointerode: {}".format(oinstruction_pointerode))
+        raise ParseError("Unknown opcode: {}".format(opcode))
+
 
 def gravity_assist_func(intcode, noun, verb):
     intcode[1] = noun
@@ -36,7 +40,7 @@ def gravity_assist_func(intcode, noun, verb):
     except ParseError as e:
         print(e)
     return intcode[0]
-    
+
 if __name__ == '__main__':
     gravity_assist = []
     with open('input.txt') as f:
