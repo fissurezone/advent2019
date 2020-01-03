@@ -91,11 +91,32 @@ def increment(digits):
     return digits[:idx+1] + [digits[idx]] * (5 - idx)
 
 
-def permutations(start_list, end_list):
-    while ordinal(start_list) <= ordinal(end_list):
-        if has_adjacent_repeated_digits(start_list):
-            yield start_list
-        start_list = increment(start_list)
+def permutations(start_digits, end_digits):
+    while ordinal(start_digits) <= ordinal(end_digits):
+        if has_adjacent_repeated_digits(start_digits):
+            yield start_digits
+        start_digits = increment(start_digits)
+
+
+def permutations_with_exactly_pair(start_digits, end_digits):
+    for digits in permutations(start_digits, end_digits):
+        if has_exactly_pair_adjacent_repeated(digits):
+            yield digits
+
+
+def has_exactly_pair_adjacent_repeated(digits):
+    match_length = 0
+    for left, right in zip(digits, digits[1:]):
+        if left == right:
+            match_length += 1
+        elif match_length == 1:
+            return True
+        else:
+            match_length = 0
+    if match_length == 1:
+        return True
+    return False
+
 
 if __name__ == '__main__':
     range_string = '264793-803935'
@@ -105,5 +126,8 @@ if __name__ == '__main__':
 
     start = monotonic_floor(digits_list(start))
     end = monotonic_ceiling(digits_list(end))
-    nums = [''.join([str(digit) for digit in digits]) for digits in permutations(start, end)]
-    print(len(nums))
+    nums = permutations(start, end)
+    print('Part 1: ', sum(1 for n in nums))
+
+    nums = permutations_with_exactly_pair(start, end)
+    print('Part 2: ', sum(1 for n in nums))
