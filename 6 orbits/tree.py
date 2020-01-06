@@ -1,3 +1,4 @@
+
 class Tree(object):
     def __init__(self, name: str, parent=None):
         self.name = name
@@ -25,10 +26,10 @@ class Tree(object):
 
     def __str__(self):
         first_lead = self.name + '─'
-        other_filler = '\n│   '
-        other_lead = '├───'
-        last_lead = '└───'
-        last_filler = '\n    '
+        other_filler = '\n│' + ' ' * len(self.name)
+        other_lead = '├' + '─' * len(self.name)
+        last_lead = '└' + '─' * len(self.name)
+        last_filler = '\n ' + ' ' * len(self.name)
 
         if self.children:
             subtrees = []
@@ -39,16 +40,33 @@ class Tree(object):
             return '\n'.join(subtrees)
         return self.name
 
+    def count_orbiters_orbits(self, depth=0):
+        if not self.children:
+            return depth
+        return depth + sum(child.count_orbiters_orbits(depth + 1) for child in self.children)
+
+    def orbits(self):
+        if not self.parent:
+            return []
+        return self.parent.orbits() + [self.parent.name]
 
 if __name__ == '__main__':
-    com = Tree('COM')
     with open('input.txt') as f:
         tail = [orbit.strip().split(')') for orbit in f.readlines()]
+
+    orbits_map = Tree('COM')
     while tail:
         centre, body = tail.pop(0)
-        if centre in com:
-            com[centre].push(body)
+        if centre in orbits_map:
+            orbits_map[centre].push(body)
         else:
             tail.append((centre, body))
+    print('part 1: {}'.format(orbits_map.count_orbiters_orbits()))
 
-    print(com)
+    your_orbits = orbits_map['YOU'].orbits()
+    santas_orbits = orbits_map['SAN'].orbits()
+    idx = 0
+    while your_orbits[idx] == santas_orbits[idx]:
+        idx += 1
+    orbit_maneuvers = len(your_orbits[idx:]) + len(santas_orbits[idx:])
+    print('part 2: {}'.format(orbit_maneuvers))
