@@ -121,46 +121,56 @@ def run_sub_routine(arr, program_counter=0, *args):
     return tuple(output_tuple)
 
 
-def input_output_closure_generator(initial_input=None):
-    input_queue = [initial_input]
-    output_queue = []
+def make_async_input_operator():
+    input_queue = []
 
     def enqueue_integer_input(val):
-        global input_queue
         try:
             val = int(val)
         except ValueError:
             raise ValueError("Invalid integer input {}.".format(val))
-        input_queue = val
+        input_queue.append(val)
 
-    def dequeue_integer_output():
-        if not output_queue:
-            return None
-        return output_queue.pop(0)
-
-    def supply_input(*unused):
+    def read_input_operator(*unused):
         del unused
         if input_queue:
             return input_queue.pop(0)
         else:
             raise WaitingInputSignal('')
 
-    def output_builder(val):
+    return read_input_operator, enqueue_integer_input
+
+
+def make_async_output_operator():
+    output_queue = []
+
+    def has_output():
+        return len(output_queue) > 0
+
+    def dequeue_output():
+        if not output_queue:
+            return None
+        return output_queue.pop(0)
+
+    def store_output_operator(val):
         output_queue.append(val)
         return val
 
-    return supply_input, output_builder, enqueue_integer_input, dequeue_integer_output
+    return store_output_operator, has_output, dequeue_output
 
 
 def run_until_next_input(arr, program_counter=0, initial_input=None):
-    input_op, output_op, set_input, get_output = input_output_closure_generator(initial_input)
+    input_op, append_input = make_async_input_operator()
+    output_op, has_output, get_output = make_async_output_operator()
+
+    if initial_input is not None:
+        append_input(initial_input)
+
     while program_counter is not None:
         try:
-            print(program_counter)
             program_counter = run_step(arr, program_counter, input_op=input_op, output_op=output_op)
-            output = get_output()
-            if output is not None:
-                yield output
+            if has_output():
+                yield get_output()
         except WaitingInputSignal:
-            set_input((yield))
+            append_input((yield))
             continue
