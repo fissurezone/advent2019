@@ -1,5 +1,7 @@
 from operator import add, mul, truth, lt, eq
-import asyncio
+
+class ParseError(Exception): pass
+class WaitingInputSignal(Exception): pass
 
 
 def read_int(*unused):
@@ -23,10 +25,6 @@ def true_option(val1, val2):
 
 def false_option(val1, val2):
     return None if val1 else val2
-
-
-class ParseError(Exception): pass
-class WaitingInputSignal(Exception): pass
 
 
 def run_step(arr, program_counter=0, input_op=read_int, output_op=print_value):
@@ -123,31 +121,46 @@ def run_sub_routine(arr, program_counter=0, *args):
     return tuple(output_tuple)
 
 
-def run_until_next_input(arr, program_counter=0, initial_input=None):
-    new_input = initial_input
-    pending_output = []
+def input_output_closure_generator(initial_input=None):
+    input_queue = [initial_input]
+    output_queue = []
+
+    def enqueue_integer_input(val):
+        global input_queue
+        try:
+            val = int(val)
+        except ValueError:
+            raise ValueError("Invalid integer input {}.".format(val))
+        input_queue = val
+
+    def dequeue_integer_output():
+        if not output_queue:
+            return None
+        return output_queue.pop(0)
 
     def supply_input(*unused):
         del unused
-        global new_input
-        if new_input is None:
-            raise WaitingInputSignal('')
+        if input_queue:
+            return input_queue.pop(0)
         else:
-            try:
-                val = int(new_input)
-            except ValueError:
-                raise ValueError("Invalid integer input {}.".format(val))
-        new_input = None
-        return val
+            raise WaitingInputSignal('')
 
     def output_builder(val):
-        pending_output.append(val)
+        output_queue.append(val)
         return val
 
+    return supply_input, output_builder, enqueue_integer_input, dequeue_integer_output
+
+
+def run_until_next_input(arr, program_counter=0, initial_input=None):
+    input_op, output_op, set_input, get_output = input_output_closure_generator(initial_input)
     while program_counter is not None:
         try:
             print(program_counter)
-            program_counter = run_step(arr, program_counter, input_op=supply_input, output_op=output_builder)
+            program_counter = run_step(arr, program_counter, input_op=input_op, output_op=output_op)
+            output = get_output()
+            if output is not None:
+                yield output
         except WaitingInputSignal:
-            new_input = (yield tuple(pending_output))
-    return tuple(pending_output)
+            set_input((yield))
+            continue
