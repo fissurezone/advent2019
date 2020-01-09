@@ -59,9 +59,12 @@ class OpCode(Enum):
 
 
 def _run_instruction(memory, process_state, input_op=read_int, output_op=print_value):
-    def read_memory(idx):
+    def extend_memory_space(idx):
         if idx >= len(memory):
             memory.extend([0] * (idx + 1 - len(memory)))
+
+    def read_memory(idx):
+        extend_memory_space(idx)
         return memory[idx]
 
     def get_value_by_mode(param, mode):
@@ -74,8 +77,7 @@ def _run_instruction(memory, process_state, input_op=read_int, output_op=print_v
     def store_memory(idx, mode, val):
         if mode == ParameterMode.RELATIVE:
             idx += process_state.relative_base
-        if idx >= len(memory):
-            memory.extend([0] * (idx + 1 - len(memory)))
+        extend_memory_space(idx)
         memory[idx] = int(val)
 
     def offset_relative_base(val):
@@ -89,14 +91,14 @@ def _run_instruction(memory, process_state, input_op=read_int, output_op=print_v
             store_memory(param1, mode1, res)
     unary_operator.arg_count = 1
 
-    def binary_jump_operator(operator, param1, param2, mode1, mode2) -> int:
+    def binary_jump_option_operator(operator, param1, param2, mode1, mode2) -> int:
         val1 = get_value_by_mode(param1, mode1)
         val2 = get_value_by_mode(param2, mode2)
         return operator(val1, val2)
-    binary_jump_operator.arg_count = 2
+    binary_jump_option_operator.arg_count = 2
 
     def binary_store_operator(operator, param1, param2, param3, mode1, mode2, mode3) -> None:
-        store_memory(param3, mode3, binary_jump_operator(operator, param1, param2, mode1, mode2))
+        store_memory(param3, mode3, binary_jump_option_operator(operator, param1, param2, mode1, mode2))
     binary_store_operator.arg_count = 3
 
     opcode_map = {
@@ -104,8 +106,8 @@ def _run_instruction(memory, process_state, input_op=read_int, output_op=print_v
         OpCode.MULTIPLY: (binary_store_operator, mul),
         OpCode.INPUT: (unary_operator, input_op),
         OpCode.OUTPUT: (unary_operator, output_op),
-        OpCode.JUMP_IF_TRUE: (binary_jump_operator, true_option),
-        OpCode.JUMP_IF_FALSE: (binary_jump_operator, false_option),
+        OpCode.JUMP_IF_TRUE: (binary_jump_option_operator, true_option),
+        OpCode.JUMP_IF_FALSE: (binary_jump_option_operator, false_option),
         OpCode.LESSER_THAN: (binary_store_operator, lt),
         OpCode.GREATER_THAN: (binary_store_operator, eq),
         OpCode.RELATIVE_BASE_OFFSET: (unary_operator, offset_relative_base)
@@ -207,8 +209,8 @@ def make_async_output_operator():
 
 
 def run_until_next_input(arr, initial_input=None, **proc_kw_args):
-    input_op, append_input = make_async_input_operator()
-    output_op, has_output, get_output = make_async_output_operator()
+    async_input_op, append_input = make_async_input_operator()
+    async_output_op, has_output, get_output = make_async_output_operator()
     proc_state = ProcessState(**proc_kw_args)
 
     if initial_input is not None:
@@ -216,8 +218,8 @@ def run_until_next_input(arr, initial_input=None, **proc_kw_args):
 
     while proc_state is not None:
         try:
-            proc_state = _run_instruction(arr, proc_state, input_op=input_op, output_op=output_op)
-            if has_output():
+            proc_state = _run_instruction(arr, proc_state, input_op=async_input_op, output_op=async_output_op)
+            while has_output():
                 yield get_output()
         except WaitingInputSignal:
             append_input((yield))
