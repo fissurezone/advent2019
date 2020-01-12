@@ -3,8 +3,6 @@ from enum import Enum
 
 
 class ParseError(Exception): pass
-
-
 class WaitingInputSignal(Exception): pass
 
 
@@ -30,13 +28,20 @@ def false_option(val1, val2):
     return val2 if val1 == 0 else None
 
 
-class ProcessState(object):
+class Status(Enum):
+    INITIALISED = 0
+    RUNNING = 1
+    TERMINATED = 2
+
+
+class ProgramState(object):
     def __init__(self, program_counter=0, relative_base=0):
+        self.status = Status.INITIALISED
         self.program_counter = program_counter
         self.relative_base = relative_base
 
     def __repr__(self):
-        return '{}, {}'.format(self.program_counter, self.relative_base)
+        return '{}, {}, {}'.format(self.status, self.program_counter, self.relative_base)
 
 
 class ParameterMode(Enum):
@@ -59,6 +64,8 @@ class OpCode(Enum):
 
 
 def _run_instruction(memory, process_state, input_op=read_int, output_op=print_value):
+    process_state.status = Status.RUNNING
+
     def extend_memory_space(idx):
         if idx >= len(memory):
             memory.extend([0] * (idx + 1 - len(memory)))
@@ -84,6 +91,7 @@ def _run_instruction(memory, process_state, input_op=read_int, output_op=print_v
         process_state.relative_base += val
 
     def unary_operator(operator, param1, mode1) -> None:
+        # handles get, set, increment, etc.
         val = get_value_by_mode(param1, mode1)
         res = operator(val)
         # (if operation returns a result) store result in same operation
@@ -121,7 +129,7 @@ def _run_instruction(memory, process_state, input_op=read_int, output_op=print_v
     opcode = OpCode(instruction % 100)
 
     if opcode == OpCode.HALT:
-        return None
+        process_state.status = Status.TERMINATED
     elif opcode in opcode_map:
         operator_type, operator_func = opcode_map[opcode]
 
@@ -137,14 +145,14 @@ def _run_instruction(memory, process_state, input_op=read_int, output_op=print_v
             process_state.program_counter = process_state.program_counter + operator_type.arg_count + 1
         else:
             process_state.program_counter = option_jump
-        return process_state
     else:
         raise ParseError("Unknown opcode: {}".format(opcode))
+    return process_state
 
 
 def run(arr, input_op=read_int, output_op=print_value, **proc_kw_args):
-    proc_state = ProcessState(**proc_kw_args)
-    while proc_state is not None:
+    proc_state = ProgramState(**proc_kw_args)
+    while proc_state.status != Status.TERMINATED:
         proc_state = _run_instruction(arr, proc_state, input_op=input_op, output_op=output_op)
 
 
@@ -177,7 +185,7 @@ def make_async_input_operator():
     def enqueue_integer_input(val):
         try:
             val = int(val)
-        except ValueError:
+        except (ValueError, TypeError):
             raise ValueError("Invalid integer input {}.".format(val))
         input_queue.append(val)
 
@@ -209,18 +217,18 @@ def make_async_output_operator():
 
 
 def run_until_next_input(arr, initial_input=None, **proc_kw_args):
-    async_input_op, append_input = make_async_input_operator()
-    async_output_op, has_output, get_output = make_async_output_operator()
-    proc_state = ProcessState(**proc_kw_args)
+    async_input_op, feed_input = make_async_input_operator()
+    async_output_op, output_waiting, pop_output = make_async_output_operator()
+    proc_state = ProgramState(**proc_kw_args)
 
     if initial_input is not None:
-        append_input(initial_input)
+        feed_input(initial_input)
 
-    while proc_state is not None:
+    while proc_state.status != Status.TERMINATED:
         try:
             proc_state = _run_instruction(arr, proc_state, input_op=async_input_op, output_op=async_output_op)
-            while has_output():
-                yield get_output()
+            while output_waiting():
+                yield pop_output()
         except WaitingInputSignal:
-            append_input((yield))
+            feed_input((yield))
             continue
