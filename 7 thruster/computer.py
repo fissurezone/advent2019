@@ -160,17 +160,17 @@ def make_async_output_operator():
 
 
 def run_until_next_input(arr, program_counter=0, initial_input=None):
-    input_op, append_input = make_async_input_operator()
-    output_op, has_output, get_output = make_async_output_operator()
+    input_op, feed_input = make_async_input_operator()
+    output_op, output_waiting, pop_output = make_async_output_operator()
 
     if initial_input is not None:
-        append_input(initial_input)
+        feed_input(initial_input)
 
     while program_counter is not None:
         try:
             program_counter = run_step(arr, program_counter, input_op=input_op, output_op=output_op)
-            if has_output():
-                yield get_output()
+            if output_waiting():
+                yield pop_output()
         except WaitingInputSignal:
-            append_input((yield))
+            feed_input((yield))
             continue
