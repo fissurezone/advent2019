@@ -1,5 +1,6 @@
 from operator import add, mul, truth, lt, eq
 from enum import Enum
+from dataclasses import dataclass
 
 
 class ParseError(Exception): pass
@@ -34,14 +35,11 @@ class Status(Enum):
     TERMINATED = 2
 
 
-class ProgramState(object):
-    def __init__(self, program_counter=0, relative_base=0):
-        self.status = Status.INITIALISED
-        self.program_counter = program_counter
-        self.relative_base = relative_base
-
-    def __repr__(self):
-        return '{}, {}, {}'.format(self.status, self.program_counter, self.relative_base)
+@dataclass
+class ProgramState:
+    status: Status = Status.INITIALISED
+    program_counter: int = 0
+    relative_base: int = 0
 
 
 class ParameterMode(Enum):
